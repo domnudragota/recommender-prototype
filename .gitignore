@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+data/*.db
+data/*.sqlite
+models/*.pt
+models/*.onnx
+.DS_Store
