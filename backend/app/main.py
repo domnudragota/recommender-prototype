@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, HTTPException
 
 from backend.app.config import settings
 from backend.app.logging_setup import setup_logging
 from backend.app.db import connect, init_db
+from backend.recommender.baseline import recommend_baseline
 
 setup_logging(settings.log_level)
 
@@ -17,7 +18,6 @@ async def lifespan(app: FastAPI):
     conn.close()
 
     yield
-
     # nothing to clean up for sqlite here
 
 
@@ -85,3 +85,37 @@ def debug_interactions(
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+@app.get("/recommendations")
+def recommendations(
+    user_id: int = Query(..., ge=1),
+    k: int = Query(10, ge=1, le=100),
+    platform: str = Query("web"),
+):
+    conn = connect()
+
+    # if user does not exist, return 404
+    user = conn.execute("SELECT id FROM users WHERE id = ?", (user_id,)).fetchone()
+    if not user:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+
+    recs = recommend_baseline(conn, user_id=user_id, k=k, platform=platform)
+    conn.close()
+
+    return {
+        "user_id": user_id,
+        "k": k,
+        "platform": platform,
+        "items": [
+            {
+                "item_id": r.item_id,
+                "title": r.title,
+                "genres": r.genres,
+                "score": r.score,
+                "stats": r.stats,  # useful for demo/debug
+            }
+            for r in recs
+        ],
+    }
