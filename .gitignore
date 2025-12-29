@@ -7,3 +7,4 @@ data/*.sqlite
 models/*.pt
 models/*.onnx
 .DS_Store
+data/movielens/

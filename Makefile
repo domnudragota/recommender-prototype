@@ -11,6 +11,12 @@ install: venv
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt
 
+fetch-ml100k:
+	PYTHONPATH=. $(PY) scripts/fetch_movielens_100k.py
+
+seed-ml100k:
+	PYTHONPATH=. $(PY) scripts/seed_movielens_100k.py --reset
+
 dev:
 	$(VENV)/bin/uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 
