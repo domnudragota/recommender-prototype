@@ -61,3 +61,28 @@ The client side (web/mobile) will be represented by:
 make install
 cp .env.example .env
 make dev
+```
+
+--- 
+## Resources and bibliography (implementation-focused)
+
+- FastAPI. (n.d.). *Lifespan Events*. https://fastapi.tiangolo.com/advanced/events/
+
+- FastAPI. (n.d.). *Settings and Environment Variables*. https://fastapi.tiangolo.com/advanced/settings/
+
+- GroupLens Research. (1998). *MovieLens 100K Dataset*.  https://grouplens.org/datasets/movielens/100k/
+
+- Harper, F. M., & Konstan, J. A. (2015). The MovieLens datasets: History and context. *ACM Transactions on Interactive Intelligent Systems, 5*(4), Article 19. https://doi.org/10.1145/2827872
+
+- Pydantic. (n.d.). *Pydantic Settings: Settings Management*. https://docs.pydantic.dev/latest/concepts/pydantic_settings/
+
+- PyTorch. (n.d.). *torch.nn.Embedding*. https://docs.pytorch.org/docs/stable/generated/torch.nn.Embedding.html
+
+- PyTorch. (n.d.). *torch.nn.BCEWithLogitsLoss*. https://docs.pytorch.org/docs/stable/generated/torch.nn.BCEWithLogitsLoss.html
+
+- SQLite. (n.d.). *Foreign Key Support*. https://sqlite.org/foreignkeys.html
+
+- Uvicorn. (n.d.). *Uvicorn Documentation*. https://uvicorn.dev/
+
+- Neural Collaborative Filtering. https://www.geeksforgeeks.org/deep-learning/neural-collaborative-filtering/
+
