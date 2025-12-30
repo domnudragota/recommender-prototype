@@ -22,3 +22,10 @@ dev:
 
 clean:
 	rm -rf $(VENV) __pycache__ .pytest_cache
+
+train-nn:
+	PYTHONPATH=. $(PY) scripts/train_nn.py
+
+smoke-nn:
+	PYTHONPATH=. $(PY) scripts/smoke_nn.py --user-id 1
+

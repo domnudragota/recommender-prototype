@@ -3,3 +3,5 @@ uvicorn[standard]>=0.27
 pydantic>=2.6
 pydantic-settings>=2.2
 python-dotenv>=1.0
+torch>=2.1
+numpy>=1.26

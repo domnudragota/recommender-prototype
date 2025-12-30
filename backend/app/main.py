@@ -228,3 +228,138 @@ def debug_engagements(
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+@app.get("/metrics/pac")
+def metrics_pac(
+    # unix timestamps; if missing we default to last 7 days
+    start_ts: int | None = Query(default=None, ge=0),
+    end_ts: int | None = Query(default=None, ge=0),
+
+    # evaluation settings
+    k: int = Query(10, ge=1, le=100),
+    window_hours: int = Query(24, ge=1, le=168),  # up to 7 days window
+    platform: str | None = Query(default=None),   # filter, e.g. "web"
+    engine: str | None = Query(default=None),     # filter, e.g. "baseline"
+    action_types: str = Query("click"),           # comma-separated: "click,like"
+):
+    """
+      For each recommendation impression, compute (# engaged items in top-K) / K,
+      then average across impressions
+    """
+    now = int(time.time())
+    if end_ts is None:
+        end_ts = now
+    if start_ts is None:
+        start_ts = end_ts - 7 * 24 * 3600  # last 7 days
+
+    if start_ts > end_ts:
+        raise HTTPException(status_code=400, detail="start_ts must be <= end_ts")
+
+    window_sec = window_hours * 3600
+    allowed_actions = {a.strip() for a in action_types.split(",") if a.strip()}
+    if not allowed_actions:
+        raise HTTPException(status_code=400, detail="action_types must contain at least one value")
+
+    conn = connect()
+
+    # build impressions query with optional filters
+    sql = """
+        SELECT recset_id, user_id, platform, ts, k, engine, item_ids_json
+        FROM rec_impressions
+        WHERE ts >= ? AND ts <= ?
+    """
+    params: list[object] = [start_ts, end_ts]
+
+    if platform is not None:
+        sql += " AND platform = ?"
+        params.append(platform)
+
+    if engine is not None:
+        sql += " AND engine = ?"
+        params.append(engine)
+
+    sql += " ORDER BY ts ASC"
+
+    impressions = conn.execute(sql, tuple(params)).fetchall()
+
+    if not impressions:
+        conn.close()
+        return {
+            "pac_mean": 0.0,
+            "impressions": 0,
+            "k": k,
+            "window_hours": window_hours,
+            "start_ts": start_ts,
+            "end_ts": end_ts,
+            "platform": platform,
+            "engine": engine,
+            "action_types": sorted(list(allowed_actions)),
+            "note": "No impressions in the selected time range.",
+        }
+
+    pac_sum = 0.0
+    denom_sum = 0
+    total_hits = 0
+
+    for imp in impressions:
+        recset_id = imp["recset_id"]
+        imp_ts = int(imp["ts"])
+
+        # top-K items from this impression
+        try:
+            item_ids = json.loads(imp["item_ids_json"])
+            if not isinstance(item_ids, list):
+                item_ids = []
+        except Exception:
+            item_ids = []
+
+        topk = [int(x) for x in item_ids[:k]]
+        if not topk:
+            continue
+
+        # engagement window for this impression
+        window_end = imp_ts + window_sec
+
+        # fetch engagements linked to this impression within the time window
+        # and only for the chosen action types
+        q_marks = ",".join(["?"] * len(allowed_actions))
+        eng_rows = conn.execute(
+            f"""
+            SELECT DISTINCT item_id
+            FROM engagements
+            WHERE recset_id = ?
+              AND ts >= ?
+              AND ts <= ?
+              AND action_type IN ({q_marks})
+            """,
+            (recset_id, imp_ts, window_end, *allowed_actions),
+        ).fetchall()
+
+        engaged_items = {int(r["item_id"]) for r in eng_rows}
+
+        hits = sum(1 for item_id in topk if item_id in engaged_items)
+
+        pac_sum += hits / len(topk)
+        denom_sum += len(topk)
+        total_hits += hits
+
+    conn.close()
+
+    impressions_used = len(impressions)
+    pac_mean = pac_sum / impressions_used if impressions_used > 0 else 0.0
+    pac_micro = total_hits / denom_sum if denom_sum > 0 else 0.0  # overall hit ratio
+
+    return {
+        "pac_mean": pac_mean,     # mean over impressions
+        "pac_micro": pac_micro,   # total_hits / total_recommended
+        "impressions": impressions_used,
+        "total_hits": total_hits,
+        "total_recommended": denom_sum,
+        "k": k,
+        "window_hours": window_hours,
+        "start_ts": start_ts,
+        "end_ts": end_ts,
+        "platform": platform,
+        "engine": engine,
+        "action_types": sorted(list(allowed_actions)),
+    }

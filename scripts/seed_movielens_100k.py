@@ -5,17 +5,23 @@ import sqlite3
 from backend.app.db import connect, init_db
 
 def load_genres(path: str) -> list[str]:
-    genres = []
+    id_to_name: dict[int, str] = {}
+    max_id = -1
+
     with open(path, "r", encoding="latin-1") as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
-            name, _gid = line.split("|")
-            if name.lower() == "unknown":
-                continue
-            genres.append(name)
-    return genres
+            name, gid = line.split("|")
+            gid = int(gid)
+            id_to_name[gid] = name
+            if gid > max_id:
+                max_id = gid
+
+    # index == genre id (so u.item flags match correctly)
+    return [id_to_name[i] for i in range(max_id + 1)]
+
 
 def seed_users(conn: sqlite3.Connection, u_user_path: str) -> None:
     rows = []
@@ -55,8 +61,9 @@ def seed_items(conn: sqlite3.Connection, u_item_path: str, genres_order: list[st
                 if i >= len(genres_order):
                     break
                 if flag == "1":
-                    g.append(genres_order[i])
-
+                    gname = genres_order[i]
+                    if gname.lower() != "unknown":
+                        g.append(gname)
             rows.append((movie_id, title, release_date, imdb_url, ",".join(g)))
 
     conn.executemany(
@@ -86,6 +93,9 @@ def seed_interactions(conn: sqlite3.Connection, u_data_path: str, platform: str)
     )
 
 def clear_tables(conn: sqlite3.Connection) -> None:
+    # delete child tables first (due to foreign keys)
+    conn.execute("DELETE FROM engagements;")
+    conn.execute("DELETE FROM rec_impressions;")
     conn.execute("DELETE FROM interactions;")
     conn.execute("DELETE FROM items;")
     conn.execute("DELETE FROM users;")
